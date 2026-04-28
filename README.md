@@ -19,7 +19,7 @@ Searches run against that local index, not directly against Apple's database.
 
 To grant access, open **System Settings** > **Privacy & Security** > **Full Disk Access**, enable your terminal app or VS Code, then restart that app.
 
-The first Contacts sync may prompt macOS for Contacts permission.
+On startup, the server requests Contacts permission and, if granted, syncs Contacts into the local index in the background.
 
 ## Run Locally
 
@@ -59,7 +59,7 @@ Instead it:
 - watches `chat.db`, `chat.db-wal`, and `chat.db-shm` for filesystem changes when those files exist
 - debounces file changes and runs an incremental sync
 - runs a timer fallback, defaulting to every 30 seconds
-- exposes manual sync and rebuild endpoints
+- exposes admin endpoints for operational checks, manual sync, and rebuilds
 
 The initial background sync indexes messages in batches. For a full clean rebuild, call:
 
@@ -68,6 +68,8 @@ POST http://127.0.0.1:8080/api/index/rebuild
 ```
 
 ## API
+
+The API is intentionally small for MCP use. An MCP server should search for likely messages, then fetch nearby conversation context for any promising hit before answering the user.
 
 ### `GET /healthz`
 
@@ -93,26 +95,18 @@ Indexes messages with `ROWID` greater than the highest row already indexed.
 
 Deletes the local index and rebuilds it from Apple's read-only database.
 
-### `POST /api/contacts/sync`
-
-Reads macOS Contacts and stores phone/email-to-name mappings in the local index DB. This does not modify Contacts or Messages.
-
-Run this after starting the server if you want to search by a person's name:
-
-```http
-POST http://127.0.0.1:8080/api/contacts/sync
-```
-
 ### `GET /api/messages/search`
 
-Recommended endpoint for agents and user-facing search.
+Finds candidate messages from the local decoded index.
 
 Query parameters:
 
-- `person`: optional contact name, phone number, email address, group chat name, or chat identifier
-- `phrase`: optional word or phrase to search in decoded message text
+- `person`: contact name, phone number, email address, group chat name, or chat identifier
+- `phrase`: word or phrase to search in decoded message text
 - `limit`: optional result limit, default `50`, max `500`
 - `offset`: optional pagination offset
+
+At least one of `person` or `phrase` is required.
 
 Examples:
 
@@ -121,41 +115,6 @@ GET http://127.0.0.1:8080/api/messages/search?person=Julian&limit=50
 GET http://127.0.0.1:8080/api/messages/search?phrase=Wordle&limit=50
 GET http://127.0.0.1:8080/api/messages/search?person=Julian&phrase=Wordle&limit=50
 ```
-
-### `GET /api/people`
-
-Looks up synced Contacts identities by name, phone, or email.
-
-```http
-GET http://127.0.0.1:8080/api/people?query=Julian&limit=25
-```
-
-### `GET /api/messages/recent`
-
-Returns recent messages from the local decoded index. Defaults to 5.
-
-```http
-GET http://127.0.0.1:8080/api/messages/recent
-GET http://127.0.0.1:8080/api/messages/recent?limit=10
-```
-
-### `GET /api/messages`
-
-Returns messages from the local decoded index, newest first.
-
-Query parameters:
-
-- `with`: optional phone number, email, chat identifier, or display-name fragment
-- `limit`: optional result limit, default `50`, max `500`
-- `offset`: optional pagination offset
-
-```http
-GET http://127.0.0.1:8080/api/messages?with=555&limit=50
-```
-
-### `GET /api/messages/{messageID}`
-
-Returns one indexed message by stable Messages row ID.
 
 ### `GET /api/messages/{messageID}/context`
 
@@ -168,72 +127,6 @@ Query parameters:
 
 ```http
 GET http://127.0.0.1:8080/api/messages/157973/context?before=10&after=10
-```
-
-### `GET /api/chats`
-
-Lists indexed conversations, newest first.
-
-Query parameters:
-
-- `query`: optional display name, chat identifier, or participant handle fragment
-- `limit`: optional result limit, default `50`, max `500`
-- `offset`: optional pagination offset
-
-```http
-GET http://127.0.0.1:8080/api/chats?query=Cheap%20Housing&limit=25
-```
-
-### `GET /api/chats/{chatID}/summary`
-
-Returns aggregate metadata for one chat: identifiers, message count, first/last message dates, and participants.
-
-### `GET /api/chats/{chatID}/messages`
-
-Returns messages in one chat, newest first.
-
-Query parameters:
-
-- `before`: optional ISO-8601 timestamp upper bound
-- `limit`: optional result limit, default `50`, max `500`
-- `offset`: optional pagination offset
-
-```http
-GET http://127.0.0.1:8080/api/chats/766/messages?limit=50
-```
-
-### `GET /api/participants`
-
-Lists indexed participants/handles, newest first.
-
-Query parameters:
-
-- `query`: optional phone/email fragment
-- `limit`: optional result limit, default `50`, max `500`
-- `offset`: optional pagination offset
-
-### `GET /api/timeline`
-
-Returns messages across all chats in a time window, newest first.
-
-Query parameters:
-
-- `since`: optional ISO-8601 timestamp lower bound
-- `until`: optional ISO-8601 timestamp upper bound
-- `limit`: optional result limit, default `100`, max `500`
-- `offset`: optional pagination offset
-
-```http
-GET http://127.0.0.1:8080/api/timeline?since=2026-04-27T00:00:00Z&until=2026-04-29T00:00:00Z&limit=100
-```
-
-### `GET /api/search`
-
-Searches the local decoded full-text index.
-
-```http
-GET http://127.0.0.1:8080/api/search?query=dinner&limit=50
-GET http://127.0.0.1:8080/api/search?query=dinner&with=555&limit=50
 ```
 
 ## Test With HTTP Yak

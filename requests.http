@@ -1,11 +1,7 @@
 @host = http://127.0.0.1:8080
-@chatID = 766
 @person = Tyler
-@displayName = Cheap Housing Collective
-@messageID = 157973
-@phrase = 🟩
-@since = 2026-04-27T00:00:00Z
-@until = 2026-04-29T00:00:00Z
+@messageID = 157312
+@phrase = birthday
 
 ### Health
 GET {{host}}/healthz
@@ -19,71 +15,20 @@ GET {{host}}/api/index/status
 ### Local index text-source stats
 GET {{host}}/api/index/stats
 
-### Sync macOS Contacts into the local index
-POST {{host}}/api/contacts/sync
-
 ### Sync new messages into the local plain-text index
 POST {{host}}/api/index/sync
 
 ### Rebuild the local plain-text index from scratch
 POST {{host}}/api/index/rebuild
 
-### Most recent 5 indexed messages
-GET {{host}}/api/messages/recent
-
-### Most recent N indexed messages
-GET {{host}}/api/messages/recent?limit=10
-
-### Simple agent search: messages with a person by contact name, phone, email, or chat name
+### Search messages with a person by contact name, phone, email, or chat name
 GET {{host}}/api/messages/search?person={{person}}&limit=50
 
-### Simple agent search: messages containing a word or phrase
+### Search messages containing a word or phrase
 GET {{host}}/api/messages/search?phrase={{phrase}}&limit=50
 
-### Simple agent search: messages with a person containing a word or phrase
+### Search messages with a person containing a word or phrase
 GET {{host}}/api/messages/search?person={{person}}&phrase={{phrase}}&limit=50
-
-### People/contact lookup by name, phone, or email
-GET {{host}}/api/people?query={{person}}&limit=25
-
-### Conversations/chats for agent identity resolution
-GET {{host}}/api/chats?limit=25
-
-### Find a conversation by display name, chat identifier, or participant handle
-GET {{host}}/api/chats?query={{displayName}}&limit=25
-
-### Conversation summary by stable chat ID
-GET {{host}}/api/chats/{{chatID}}/summary
-
-### Messages in one conversation by stable chat ID
-GET {{host}}/api/chats/{{chatID}}/messages?limit=50
-
-### Messages in one conversation before an ISO-8601 timestamp
-GET {{host}}/api/chats/{{chatID}}/messages?limit=50&before={{until}}
-
-### Participants/handles for agent identity resolution
-GET {{host}}/api/participants?limit=25
-
-### Find participants by phone or email fragment
-GET {{host}}/api/participants?query=614&limit=25
-
-### Indexed messages with a person, number, email, or chat display name
-GET {{host}}/api/messages?with={{displayName}}&limit=50
-
-### Fetch one message by ID
-GET {{host}}/api/messages/{{messageID}}
 
 ### Fetch surrounding conversation context for one message
 GET {{host}}/api/messages/{{messageID}}/context?before=10&after=10
-
-### Timeline across all chats
-GET {{host}}/api/timeline?since={{since}}&until={{until}}&limit=100
-
-### Search decoded/indexed message text
-GET {{host}}/api/search?query={{phrase}}&limit=50
-
-### Search decoded/indexed message text with a person, number, email, or chat display name
-GET {{host}}/api/search?query={{phrase}}&with={{displayName}}&limit=50
-
-### Next page of search results
-GET {{host}}/api/search?query={{phrase}}&limit=50&offset=50
