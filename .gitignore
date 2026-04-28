@@ -1,0 +1,32 @@
+.DS_Store
+
+# Local environment and secrets
+.env
+.env.*
+
+# Swift Package Manager
+/.build/
+/.swiftpm/
+
+# Xcode / Apple build output
+DerivedData/
+*.xcuserstate
+xcuserdata/
+
+# Local binaries and release artifacts
+/bin/
+/dist/
+/imessage-handler
+
+# Local SQLite data and derived message indexes
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.sqlite-journal
+
+# Logs and temporary runtime output
+*.log
+*.tmp

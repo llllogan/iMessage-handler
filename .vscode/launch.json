@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:imessage-handler}",
+            "name": "Debug imessage-handler",
+            "target": "imessage-handler",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug imessage-handler"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:imessage-handler}",
+            "name": "Release imessage-handler",
+            "target": "imessage-handler",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release imessage-handler"
+        }
+    ]
+}
