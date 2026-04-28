@@ -54,6 +54,69 @@ final class IndexStore: @unchecked Sendable {
         )
     }
 
+    func replaceContacts(_ identities: [ContactIdentity]) throws -> ContactSyncResult {
+        try db.transaction {
+            try db.exec("DELETE FROM contact_identity")
+            for identity in identities {
+                try db.execute(
+                    """
+                    INSERT OR REPLACE INTO contact_identity (
+                        identity_value, kind, display_name, given_name, family_name, organization_name, updated_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    [
+                        .text(identity.identityValue.lowercased()),
+                        .text(identity.kind),
+                        .text(identity.displayName),
+                        optionalText(identity.givenName),
+                        optionalText(identity.familyName),
+                        optionalText(identity.organizationName),
+                        .int64(Int64(Date().timeIntervalSince1970))
+                    ]
+                )
+            }
+        }
+
+        return ContactSyncResult(
+            contacts: Set(identities.map(\.displayName)).count,
+            identities: identities.count
+        )
+    }
+
+    func contacts(query: String?, limit: Int, offset: Int) throws -> [ContactIdentity] {
+        let query = query ?? ""
+        let pattern = likePattern(query)
+        return try db.query(
+            """
+            SELECT identity_value, kind, display_name, given_name, family_name, organization_name
+            FROM contact_identity
+            WHERE
+                ? = ''
+                OR display_name LIKE ? ESCAPE '\\' COLLATE NOCASE
+                OR identity_value LIKE ? ESCAPE '\\' COLLATE NOCASE
+            ORDER BY display_name, kind, identity_value
+            LIMIT ? OFFSET ?
+            """,
+            [
+                .text(query),
+                .text(pattern),
+                .text(pattern),
+                .int(normalizeLimit(limit, defaultValue: 50)),
+                .int(max(0, offset))
+            ]
+        ) { statement in
+            ContactIdentity(
+                identityValue: statement.string(0) ?? "",
+                kind: statement.string(1) ?? "",
+                displayName: statement.string(2) ?? "",
+                givenName: statement.string(3),
+                familyName: statement.string(4),
+                organizationName: statement.string(5)
+            )
+        }
+    }
+
     func clear() throws {
         try db.transaction {
             try db.exec("DELETE FROM indexed_message")
@@ -117,7 +180,8 @@ final class IndexStore: @unchecked Sendable {
         try loadMessages(
             """
             SELECT message_id, guid, plain_text, text_source, is_from_me, service, handle_id,
-                   handle, chat_id, chat_guid, display_name, chat_identifier, date, indexed_at
+                   handle, chat_id, chat_guid, display_name, chat_identifier, date, indexed_at,
+                   (SELECT ci.display_name FROM contact_identity ci WHERE ci.identity_value = lower(indexed_message.handle) LIMIT 1)
             FROM indexed_message
             ORDER BY date DESC, message_id DESC
             LIMIT ?
@@ -130,7 +194,8 @@ final class IndexStore: @unchecked Sendable {
         try loadMessages(
             """
             SELECT message_id, guid, plain_text, text_source, is_from_me, service, handle_id,
-                   handle, chat_id, chat_guid, display_name, chat_identifier, date, indexed_at
+                   handle, chat_id, chat_guid, display_name, chat_identifier, date, indexed_at,
+                   (SELECT ci.display_name FROM contact_identity ci WHERE ci.identity_value = lower(indexed_message.handle) LIMIT 1)
             FROM indexed_message
             WHERE message_id = ?
             LIMIT 1
@@ -147,7 +212,8 @@ final class IndexStore: @unchecked Sendable {
         let beforeRows = try loadMessages(
             """
             SELECT message_id, guid, plain_text, text_source, is_from_me, service, handle_id,
-                   handle, chat_id, chat_guid, display_name, chat_identifier, date, indexed_at
+                   handle, chat_id, chat_guid, display_name, chat_identifier, date, indexed_at,
+                   (SELECT ci.display_name FROM contact_identity ci WHERE ci.identity_value = lower(indexed_message.handle) LIMIT 1)
             FROM indexed_message
             WHERE chat_id IS ? AND (date < ? OR (date = ? AND message_id < ?))
             ORDER BY date DESC, message_id DESC
@@ -165,7 +231,8 @@ final class IndexStore: @unchecked Sendable {
         let afterRows = try loadMessages(
             """
             SELECT message_id, guid, plain_text, text_source, is_from_me, service, handle_id,
-                   handle, chat_id, chat_guid, display_name, chat_identifier, date, indexed_at
+                   handle, chat_id, chat_guid, display_name, chat_identifier, date, indexed_at,
+                   (SELECT ci.display_name FROM contact_identity ci WHERE ci.identity_value = lower(indexed_message.handle) LIMIT 1)
             FROM indexed_message
             WHERE chat_id IS ? AND (date > ? OR (date = ? AND message_id > ?))
             ORDER BY date ASC, message_id ASC
@@ -189,11 +256,17 @@ final class IndexStore: @unchecked Sendable {
         return try loadMessages(
             """
             SELECT message_id, guid, plain_text, text_source, is_from_me, service, handle_id,
-                   handle, chat_id, chat_guid, display_name, chat_identifier, date, indexed_at
+                   handle, chat_id, chat_guid, display_name, chat_identifier, date, indexed_at,
+                   (SELECT ci.display_name FROM contact_identity ci WHERE ci.identity_value = lower(indexed_message.handle) LIMIT 1)
             FROM indexed_message
             WHERE
                 ? = ''
                 OR handle LIKE ? ESCAPE '\\' COLLATE NOCASE
+                OR EXISTS (
+                    SELECT 1 FROM contact_identity ci
+                    WHERE ci.identity_value = lower(indexed_message.handle)
+                      AND ci.display_name LIKE ? ESCAPE '\\' COLLATE NOCASE
+                )
                 OR display_name LIKE ? ESCAPE '\\' COLLATE NOCASE
                 OR chat_identifier LIKE ? ESCAPE '\\' COLLATE NOCASE
             ORDER BY date DESC, message_id DESC
@@ -201,6 +274,7 @@ final class IndexStore: @unchecked Sendable {
             """,
             [
                 .text(query),
+                .text(pattern),
                 .text(pattern),
                 .text(pattern),
                 .text(pattern),
@@ -215,7 +289,8 @@ final class IndexStore: @unchecked Sendable {
         return try loadMessages(
             """
             SELECT message_id, guid, plain_text, text_source, is_from_me, service, handle_id,
-                   handle, chat_id, chat_guid, display_name, chat_identifier, date, indexed_at
+                   handle, chat_id, chat_guid, display_name, chat_identifier, date, indexed_at,
+                   (SELECT ci.display_name FROM contact_identity ci WHERE ci.identity_value = lower(indexed_message.handle) LIMIT 1)
             FROM indexed_message
             WHERE chat_id = ? AND date < ?
             ORDER BY date DESC, message_id DESC
@@ -236,7 +311,8 @@ final class IndexStore: @unchecked Sendable {
         return try loadMessages(
             """
             SELECT message_id, guid, plain_text, text_source, is_from_me, service, handle_id,
-                   handle, chat_id, chat_guid, display_name, chat_identifier, date, indexed_at
+                   handle, chat_id, chat_guid, display_name, chat_identifier, date, indexed_at,
+                   (SELECT ci.display_name FROM contact_identity ci WHERE ci.identity_value = lower(indexed_message.handle) LIMIT 1)
             FROM indexed_message
             WHERE date >= ? AND date <= ?
             ORDER BY date DESC, message_id DESC
@@ -258,13 +334,19 @@ final class IndexStore: @unchecked Sendable {
             """
             SELECT im.message_id, im.guid, im.plain_text, im.text_source, im.is_from_me, im.service,
                    im.handle_id, im.handle, im.chat_id, im.chat_guid, im.display_name,
-                   im.chat_identifier, im.date, im.indexed_at
+                   im.chat_identifier, im.date, im.indexed_at,
+                   (SELECT ci.display_name FROM contact_identity ci WHERE ci.identity_value = lower(im.handle) LIMIT 1)
             FROM message_fts fts
             JOIN indexed_message im ON im.message_id = fts.rowid
             WHERE message_fts MATCH ?
               AND (
                 ? = ''
                 OR im.handle LIKE ? ESCAPE '\\' COLLATE NOCASE
+                OR EXISTS (
+                    SELECT 1 FROM contact_identity ci
+                    WHERE ci.identity_value = lower(im.handle)
+                      AND ci.display_name LIKE ? ESCAPE '\\' COLLATE NOCASE
+                )
                 OR im.display_name LIKE ? ESCAPE '\\' COLLATE NOCASE
                 OR im.chat_identifier LIKE ? ESCAPE '\\' COLLATE NOCASE
               )
@@ -274,6 +356,7 @@ final class IndexStore: @unchecked Sendable {
             [
                 .text(ftsPhrase(query)),
                 .text(participantQuery),
+                .text(pattern),
                 .text(pattern),
                 .text(pattern),
                 .text(pattern),
@@ -304,6 +387,11 @@ final class IndexStore: @unchecked Sendable {
                 OR display_name LIKE ? ESCAPE '\\' COLLATE NOCASE
                 OR chat_identifier LIKE ? ESCAPE '\\' COLLATE NOCASE
                 OR handle LIKE ? ESCAPE '\\' COLLATE NOCASE
+                OR EXISTS (
+                    SELECT 1 FROM contact_identity ci
+                    WHERE ci.identity_value = lower(indexed_message.handle)
+                      AND ci.display_name LIKE ? ESCAPE '\\' COLLATE NOCASE
+                )
               )
             GROUP BY chat_id
             ORDER BY MAX(date) DESC
@@ -311,6 +399,7 @@ final class IndexStore: @unchecked Sendable {
             """,
             [
                 .text(query),
+                .text(pattern),
                 .text(pattern),
                 .text(pattern),
                 .text(pattern),
@@ -344,6 +433,7 @@ final class IndexStore: @unchecked Sendable {
             SELECT
                 handle_id,
                 MAX(handle),
+                MAX((SELECT ci.display_name FROM contact_identity ci WHERE ci.identity_value = lower(indexed_message.handle) LIMIT 1)),
                 COUNT(*),
                 MIN(date),
                 MAX(date),
@@ -351,13 +441,22 @@ final class IndexStore: @unchecked Sendable {
             FROM indexed_message
             WHERE handle_id IS NOT NULL
               AND handle IS NOT NULL
-              AND (? = '' OR handle LIKE ? ESCAPE '\\' COLLATE NOCASE)
+              AND (
+                ? = ''
+                OR handle LIKE ? ESCAPE '\\' COLLATE NOCASE
+                OR EXISTS (
+                    SELECT 1 FROM contact_identity ci
+                    WHERE ci.identity_value = lower(indexed_message.handle)
+                      AND ci.display_name LIKE ? ESCAPE '\\' COLLATE NOCASE
+                )
+              )
             GROUP BY handle_id
             ORDER BY MAX(date) DESC
             LIMIT ? OFFSET ?
             """,
             [
                 .text(query),
+                .text(pattern),
                 .text(pattern),
                 .int(normalizeLimit(limit, defaultValue: 50)),
                 .int(max(0, offset))
@@ -366,10 +465,11 @@ final class IndexStore: @unchecked Sendable {
             ParticipantSummary(
                 handleID: statement.int64(0),
                 handle: statement.string(1) ?? "",
-                messageCount: statement.int64(2),
-                firstMessageAt: unixDate(statement.int64(3)),
-                lastMessageAt: unixDate(statement.int64(4)),
-                chats: parseParticipantChats(statement.string(5))
+                contactName: statement.string(2),
+                messageCount: statement.int64(3),
+                firstMessageAt: unixDate(statement.int64(4)),
+                lastMessageAt: unixDate(statement.int64(5)),
+                chats: parseParticipantChats(statement.string(6))
             )
         }
     }
@@ -435,6 +535,19 @@ final class IndexStore: @unchecked Sendable {
                 value INTEGER NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS contact_identity (
+                identity_value TEXT PRIMARY KEY,
+                kind TEXT NOT NULL,
+                display_name TEXT NOT NULL,
+                given_name TEXT,
+                family_name TEXT,
+                organization_name TEXT,
+                updated_at INTEGER NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS contact_identity_display_name_idx
+            ON contact_identity(display_name);
+
             CREATE VIRTUAL TABLE IF NOT EXISTS message_fts USING fts5(
                 plain_text,
                 content='indexed_message',
@@ -469,6 +582,7 @@ final class IndexStore: @unchecked Sendable {
                 service: statement.string(5),
                 handleID: optionalInt64(statement, 6),
                 handle: statement.string(7),
+                contactName: statement.string(14),
                 chatID: optionalInt64(statement, 8),
                 chatGUID: statement.string(9),
                 displayName: statement.string(10),

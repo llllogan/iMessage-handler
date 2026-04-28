@@ -5,7 +5,8 @@ do {
     let source = try MessageSourceStore(path: config.messagesDBPath)
     let index = try IndexStore(path: config.indexDBPath)
     let indexer = Indexer(source: source, index: index)
-    let api = API(config: config, source: source, index: index, indexer: indexer)
+    let contactsSync = ContactsSync()
+    let api = API(config: config, source: source, index: index, indexer: indexer, contactsSync: contactsSync)
     let scheduler = SyncScheduler(
         indexer: indexer,
         messagesDBPath: config.messagesDBPath,

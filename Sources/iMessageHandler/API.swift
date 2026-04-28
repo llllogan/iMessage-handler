@@ -5,12 +5,14 @@ final class API: @unchecked Sendable {
     private let source: MessageSourceStore
     private let index: IndexStore
     private let indexer: Indexer
+    private let contactsSync: ContactsSync
 
-    init(config: Config, source: MessageSourceStore, index: IndexStore, indexer: Indexer) {
+    init(config: Config, source: MessageSourceStore, index: IndexStore, indexer: Indexer, contactsSync: ContactsSync) {
         self.config = config
         self.source = source
         self.index = index
         self.indexer = indexer
+        self.contactsSync = contactsSync
     }
 
     func handle(_ request: HTTPRequest) throws -> HTTPResponse {
@@ -24,6 +26,20 @@ final class API: @unchecked Sendable {
         case ("GET", "/api/messages/recent"):
             let limit = intParam(request, "limit", defaultValue: 5)
             return try HTTPResponse.json(["messages": try index.recentMessages(limit: limit)])
+
+        case ("GET", "/api/messages/search"):
+            let person = firstNonEmpty(request.query["person"], request.query["with"], request.query["name"])
+            let phrase = firstNonEmpty(request.query["phrase"], request.query["query"], request.query["q"])
+            let limit = intParam(request, "limit", defaultValue: 50)
+            let offset = intParam(request, "offset", defaultValue: 0)
+            if let phrase {
+                return try HTTPResponse.json([
+                    "messages": try index.search(query: phrase, participantQuery: person, limit: limit, offset: offset)
+                ])
+            }
+            return try HTTPResponse.json([
+                "messages": try index.messages(with: person, limit: limit, offset: offset)
+            ])
 
         case ("GET", let path) where path.hasPrefix("/api/messages/") && path.hasSuffix("/context"):
             let id = try idFromPath(path, prefix: "/api/messages/", suffix: "/context")
@@ -89,6 +105,17 @@ final class API: @unchecked Sendable {
                 "participants": try index.participants(query: request.query["query"], limit: limit, offset: offset)
             ])
 
+        case ("GET", "/api/people"):
+            let limit = intParam(request, "limit", defaultValue: 50)
+            let offset = intParam(request, "offset", defaultValue: 0)
+            return try HTTPResponse.json([
+                "people": try index.contacts(query: request.query["query"], limit: limit, offset: offset)
+            ])
+
+        case ("POST", "/api/contacts/sync"):
+            let identities = try contactsSync.loadContacts()
+            return try HTTPResponse.json(try index.replaceContacts(identities))
+
         case ("GET", "/api/search"):
             guard let query = request.query["query"], !query.isEmpty else {
                 throw AppError.badRequest("query parameter is required")
@@ -147,4 +174,14 @@ private func idFromPath(_ path: String, prefix: String, suffix: String = "") thr
         throw AppError.badRequest("invalid id in path")
     }
     return id
+}
+
+private func firstNonEmpty(_ values: String?...) -> String? {
+    for value in values {
+        let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !trimmed.isEmpty {
+            return trimmed
+        }
+    }
+    return nil
 }

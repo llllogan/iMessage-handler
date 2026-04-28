@@ -110,6 +110,7 @@ final class Indexer: @unchecked Sendable {
             service: source.service,
             handleID: source.handleID,
             handle: source.handle,
+            contactName: nil,
             chatID: source.chatID,
             chatGUID: source.chatGUID,
             displayName: source.displayName,

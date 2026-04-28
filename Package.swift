@@ -14,6 +14,7 @@ let package = Package(
         .executableTarget(
             name: "iMessageHandler",
             linkerSettings: [
+                .linkedFramework("Contacts"),
                 .linkedLibrary("sqlite3")
             ]
         )

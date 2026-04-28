@@ -15,8 +15,11 @@ Searches run against that local index, not directly against Apple's database.
 - macOS
 - Swift 6 / Xcode command line tools
 - Full Disk Access for the terminal app or VS Code if it launches the server
+- Contacts access for the terminal app or VS Code if you want person-name lookup
 
 To grant access, open **System Settings** > **Privacy & Security** > **Full Disk Access**, enable your terminal app or VS Code, then restart that app.
+
+The first Contacts sync may prompt macOS for Contacts permission.
 
 ## Run Locally
 
@@ -89,6 +92,43 @@ Indexes messages with `ROWID` greater than the highest row already indexed.
 ### `POST /api/index/rebuild`
 
 Deletes the local index and rebuilds it from Apple's read-only database.
+
+### `POST /api/contacts/sync`
+
+Reads macOS Contacts and stores phone/email-to-name mappings in the local index DB. This does not modify Contacts or Messages.
+
+Run this after starting the server if you want to search by a person's name:
+
+```http
+POST http://127.0.0.1:8080/api/contacts/sync
+```
+
+### `GET /api/messages/search`
+
+Recommended endpoint for agents and user-facing search.
+
+Query parameters:
+
+- `person`: optional contact name, phone number, email address, group chat name, or chat identifier
+- `phrase`: optional word or phrase to search in decoded message text
+- `limit`: optional result limit, default `50`, max `500`
+- `offset`: optional pagination offset
+
+Examples:
+
+```http
+GET http://127.0.0.1:8080/api/messages/search?person=Julian&limit=50
+GET http://127.0.0.1:8080/api/messages/search?phrase=Wordle&limit=50
+GET http://127.0.0.1:8080/api/messages/search?person=Julian&phrase=Wordle&limit=50
+```
+
+### `GET /api/people`
+
+Looks up synced Contacts identities by name, phone, or email.
+
+```http
+GET http://127.0.0.1:8080/api/people?query=Julian&limit=25
+```
 
 ### `GET /api/messages/recent`
 

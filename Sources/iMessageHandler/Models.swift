@@ -25,6 +25,7 @@ struct IndexedMessage: Codable {
     let service: String?
     let handleID: Int64?
     let handle: String?
+    let contactName: String?
     let chatID: Int64?
     let chatGUID: String?
     let displayName: String?
@@ -73,6 +74,7 @@ struct ChatSummary: Codable {
 struct ParticipantSummary: Codable {
     let handleID: Int64
     let handle: String
+    let contactName: String?
     let messageCount: Int64
     let firstMessageAt: Date?
     let lastMessageAt: Date?
@@ -89,6 +91,20 @@ struct MessageContext: Codable {
     let message: IndexedMessage
     let before: [IndexedMessage]
     let after: [IndexedMessage]
+}
+
+struct ContactIdentity: Codable {
+    let identityValue: String
+    let kind: String
+    let displayName: String
+    let givenName: String?
+    let familyName: String?
+    let organizationName: String?
+}
+
+struct ContactSyncResult: Codable {
+    let contacts: Int
+    let identities: Int
 }
 
 func appleDate(_ raw: Int64) -> Date? {
