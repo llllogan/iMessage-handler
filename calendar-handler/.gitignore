@@ -7,9 +7,7 @@
 
 # Swift Package Manager
 /.build/
-**/.build/
 /.swiftpm/
-**/.swiftpm/
 
 # Xcode / Apple build output
 DerivedData/
@@ -19,16 +17,7 @@ xcuserdata/
 # Local binaries and release artifacts
 /bin/
 /dist/
-**/dist/
-
-# Local SQLite data and derived message indexes
-*.db
-*.db-shm
-*.db-wal
-*.sqlite
-*.sqlite-shm
-*.sqlite-wal
-*.sqlite-journal
+/calendar-handler
 
 # Logs and temporary runtime output
 *.log

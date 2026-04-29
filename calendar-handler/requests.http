@@ -1,0 +1,31 @@
+@host = http://127.0.0.1:8090
+@token = change-me
+@since = 2026-04-29
+@until = 2026-05-06
+
+### Health
+GET {{host}}/healthz
+
+### Access status
+GET {{host}}/api/access/status
+Authorization: Bearer {{token}}
+
+### Request Calendar access
+POST {{host}}/api/access/request
+Authorization: Bearer {{token}}
+
+### List calendars
+GET {{host}}/api/calendars
+Authorization: Bearer {{token}}
+
+### Events in range
+GET {{host}}/api/events/range?since={{since}}&until={{until}}&limit=50
+Authorization: Bearer {{token}}
+
+### Search events
+GET {{host}}/api/events/search?query=dentist&since={{since}}&until={{until}}&limit=20
+Authorization: Bearer {{token}}
+
+### Free time
+GET {{host}}/api/free-time?since={{since}}&until={{until}}&durationMinutes=60
+Authorization: Bearer {{token}}
