@@ -2,22 +2,29 @@ import AppKit
 import CalendarHandlerCore
 import Foundation
 
-@main
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var runtime: CalendarHandlerRuntime?
     private let statusMenuItem = NSMenuItem(title: "Starting...", action: nil, keyEquivalent: "")
+    private let logURL = FileManager.default.homeDirectoryForCurrentUser
+        .appendingPathComponent("Library/Logs/calendar-handler-menubar.log")
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        log("applicationDidFinishLaunching")
         NSApp.setActivationPolicy(.accessory)
         configureMenu()
         startRuntime()
+        requestAccessOnFirstLaunch()
     }
 
     private func configureMenu() {
-        let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        statusItem.button?.title = "Calendar"
+        log("configureMenu")
+        let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        if let button = statusItem.button {
+            button.image = NSImage(systemSymbolName: "calendar", accessibilityDescription: "Calendar Handler")
+            button.toolTip = "Calendar Handler"
+        }
 
         let menu = NSMenu()
         statusMenuItem.isEnabled = false
@@ -36,19 +43,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         statusItem.menu = menu
         self.statusItem = statusItem
+        log("status item configured")
     }
 
     private func startRuntime() {
         do {
             let runtime = try CalendarHandlerRuntime()
             self.runtime = runtime
+            log("runtime initialized")
             runtime.startInBackground { [weak self] message in
                 Task { @MainActor in
+                    self?.log("server error: \(message)")
                     self?.statusMenuItem.title = "Server error: \(message)"
                 }
             }
+            log("server start requested")
             updateStatus()
         } catch {
+            log("startup failed: \(error.localizedDescription)")
             statusMenuItem.title = "Startup failed: \(error.localizedDescription)"
         }
     }
@@ -67,6 +79,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 title = "Access failed: \(error.localizedDescription)"
             }
             Task { @MainActor in
+                self.log(title)
+                self.statusMenuItem.title = title
+            }
+        }
+    }
+
+    private func requestAccessOnFirstLaunch() {
+        guard let runtime else {
+            return
+        }
+        statusMenuItem.title = "Checking Calendar access..."
+        DispatchQueue.global(qos: .userInitiated).async {
+            let title: String
+            do {
+                title = try runtime.requestAccessIfNotDetermined()
+            } catch {
+                title = "Access failed: \(error.localizedDescription)"
+            }
+            Task { @MainActor in
+                self.log(title)
                 self.statusMenuItem.title = title
             }
         }
@@ -78,6 +110,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func updateStatus() {
         statusMenuItem.title = runtime?.statusText() ?? "Runtime not started"
+        log(statusMenuItem.title)
     }
 
     @objc private func openCalendarSettings() {
@@ -87,6 +120,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func quit() {
+        log("quit")
         NSApp.terminate(nil)
+    }
+
+    private func log(_ message: String) {
+        let line = "\(Date()) \(message)\n"
+        guard let data = line.data(using: .utf8) else {
+            return
+        }
+        if FileManager.default.fileExists(atPath: logURL.path),
+           let handle = try? FileHandle(forWritingTo: logURL) {
+            defer { try? handle.close() }
+            _ = try? handle.seekToEnd()
+            try? handle.write(contentsOf: data)
+        } else {
+            try? data.write(to: logURL, options: .atomic)
+        }
     }
 }

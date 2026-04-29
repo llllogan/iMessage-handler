@@ -39,6 +39,46 @@
             "target": "IMessageHandlerMenuBar",
             "configuration": "release",
             "preLaunchTask": "swift: Build Release IMessageHandlerMenuBar"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:apple-handler}",
+            "name": "Debug calendar-handler",
+            "target": "calendar-handler",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug calendar-handler"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:apple-handler}",
+            "name": "Release calendar-handler",
+            "target": "calendar-handler",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release calendar-handler"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:apple-handler}",
+            "name": "Debug CalendarHandlerMenuBar",
+            "target": "CalendarHandlerMenuBar",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug CalendarHandlerMenuBar"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:apple-handler}",
+            "name": "Release CalendarHandlerMenuBar",
+            "target": "CalendarHandlerMenuBar",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release CalendarHandlerMenuBar"
         }
     ]
 }

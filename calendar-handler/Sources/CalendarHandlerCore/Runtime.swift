@@ -54,6 +54,14 @@ public final class CalendarHandlerRuntime: @unchecked Sendable {
         return "Calendar access: \(status.status)"
     }
 
+    public func requestAccessIfNotDetermined() throws -> String {
+        let status = calendarStore.accessStatus()
+        guard status.status == "notDetermined" else {
+            return "Calendar access: \(status.status)"
+        }
+        return try requestAccess()
+    }
+
     public func statusText() -> String {
         let status = calendarStore.accessStatus()
         return "Running on \(listenURL). Calendar access: \(status.status)."
