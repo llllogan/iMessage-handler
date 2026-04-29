@@ -23,7 +23,7 @@ struct HTTPResponse {
     }
 }
 
-final class HTTPServer {
+final class HTTPServer: @unchecked Sendable {
     private let host: String
     private let port: UInt16
     private let handler: Handler

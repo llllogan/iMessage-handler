@@ -8,14 +8,16 @@ let package = Package(
         .macOS(.v14)
     ],
     products: [
-        .executable(name: "imessage-handler", targets: ["iMessageHandler"])
+        .library(name: "iMessageHandlerCore", targets: ["iMessageHandlerCore"]),
+        .executable(name: "imessage-handler", targets: ["iMessageHandlerCLI"]),
+        .executable(name: "IMessageHandlerMenuBar", targets: ["iMessageHandlerMenuBar"])
     ],
     dependencies: [
         .package(url: "https://github.com/swiftpackages/DotEnv.git", from: "3.0.0")
     ],
     targets: [
-        .executableTarget(
-            name: "iMessageHandler",
+        .target(
+            name: "iMessageHandlerCore",
             dependencies: [
                 .product(name: "DotEnv", package: "DotEnv")
             ],
@@ -24,9 +26,20 @@ let package = Package(
                 .linkedLibrary("sqlite3")
             ]
         ),
+        .executableTarget(
+            name: "iMessageHandlerCLI",
+            dependencies: ["iMessageHandlerCore"]
+        ),
+        .executableTarget(
+            name: "iMessageHandlerMenuBar",
+            dependencies: ["iMessageHandlerCore"],
+            linkerSettings: [
+                .linkedFramework("AppKit")
+            ]
+        ),
         .testTarget(
             name: "iMessageHandlerTests",
-            dependencies: ["iMessageHandler"]
+            dependencies: ["iMessageHandlerCore"]
         )
     ]
 )

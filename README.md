@@ -41,6 +41,30 @@ The API listens on:
 http://127.0.0.1:8080
 ```
 
+## Menu Bar App
+
+You can also run iMessage Handler as a background macOS menu bar app:
+
+```sh
+scripts/build-menubar-app.sh
+open "dist/iMessage Handler.app"
+```
+
+The app starts the same HTTP server as the CLI, shows status from the menu bar, and includes menu actions for:
+
+- Sync Now
+- Rebuild Index
+- Open Full Disk Access Settings
+- Quit
+
+For Messages database access, grant Full Disk Access to the built app:
+
+```text
+System Settings > Privacy & Security > Full Disk Access > iMessage Handler
+```
+
+If you rebuild or move the `.app`, macOS may require you to grant access again. The CLI remains available for development with `swift run imessage-handler`.
+
 Optional configuration:
 
 ```sh
@@ -52,6 +76,14 @@ IMESSAGE_API_TOKEN="long-random-token" swift run imessage-handler
 ```
 
 You can also copy `.env.example` to `.env` and run `swift run imessage-handler`. Values already exported in your shell take priority over `.env`.
+
+For the menu bar app, config is loaded from these locations when present:
+
+- `.env` in the current working directory
+- `~/Library/Application Support/imessage-handler/.env`
+- `.env` bundled into `iMessage Handler.app/Contents/Resources`
+
+The build script copies the repo `.env` into the generated app bundle if it exists.
 
 When `IMESSAGE_API_TOKEN` is set, every `/api/*` request must include:
 

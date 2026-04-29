@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import iMessageHandler
+@testable import iMessageHandlerCore
 
 struct AttributedBodyDecoderTests {
     @Test func typedStreamStringMarkerPreservesMessageWhitespace() throws {
