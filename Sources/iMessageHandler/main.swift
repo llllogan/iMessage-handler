@@ -1,6 +1,11 @@
 import Foundation
+import DotEnv
 
 do {
+    if FileManager.default.fileExists(atPath: ".env") {
+        try DotEnv.load(path: ".env", overwrite: false)
+    }
+
     let config = try Config.load()
     let source = try MessageSourceStore(path: config.messagesDBPath)
     let index = try IndexStore(path: config.indexDBPath)

@@ -250,9 +250,10 @@ final class IndexStore: @unchecked Sendable {
         return MessageContext(message: message, before: Array(beforeRows), after: afterRows)
     }
 
-    func messages(with participantQuery: String?, limit: Int, offset: Int) throws -> [IndexedMessage] {
+    func messages(with participantQuery: String?, limit: Int, offset: Int, since: Date? = nil, until: Date? = nil) throws -> [IndexedMessage] {
         let query = participantQuery ?? ""
         let pattern = likePattern(query)
+        let bounds = dateBounds(since: since, until: until)
         return try loadMessages(
             """
             SELECT message_id, guid, plain_text, text_source, is_from_me, service, handle_id,
@@ -260,15 +261,19 @@ final class IndexStore: @unchecked Sendable {
                    (SELECT ci.display_name FROM contact_identity ci WHERE ci.identity_value = lower(indexed_message.handle) LIMIT 1)
             FROM indexed_message
             WHERE
-                ? = ''
-                OR handle LIKE ? ESCAPE '\\' COLLATE NOCASE
-                OR EXISTS (
+                (
+                    ? = ''
+                    OR handle LIKE ? ESCAPE '\\' COLLATE NOCASE
+                    OR EXISTS (
                     SELECT 1 FROM contact_identity ci
                     WHERE ci.identity_value = lower(indexed_message.handle)
                       AND ci.display_name LIKE ? ESCAPE '\\' COLLATE NOCASE
+                    )
+                    OR display_name LIKE ? ESCAPE '\\' COLLATE NOCASE
+                    OR chat_identifier LIKE ? ESCAPE '\\' COLLATE NOCASE
                 )
-                OR display_name LIKE ? ESCAPE '\\' COLLATE NOCASE
-                OR chat_identifier LIKE ? ESCAPE '\\' COLLATE NOCASE
+                AND date >= ?
+                AND date <= ?
             ORDER BY date DESC, message_id DESC
             LIMIT ? OFFSET ?
             """,
@@ -278,6 +283,8 @@ final class IndexStore: @unchecked Sendable {
                 .text(pattern),
                 .text(pattern),
                 .text(pattern),
+                .int64(bounds.since),
+                .int64(bounds.until),
                 .int(normalizeLimit(limit, defaultValue: 50)),
                 .int(max(0, offset))
             ]
@@ -327,17 +334,31 @@ final class IndexStore: @unchecked Sendable {
         )
     }
 
-    func search(query: String, participantQuery: String?, limit: Int, offset: Int) throws -> [IndexedMessage] {
+    func search(
+        query: String,
+        participantQuery: String?,
+        limit: Int,
+        offset: Int,
+        mode: SearchMode = .ranked,
+        since: Date? = nil,
+        until: Date? = nil
+    ) throws -> [IndexedMessage] {
         let participantQuery = participantQuery ?? ""
         let pattern = likePattern(participantQuery)
+        let bounds = dateBounds(since: since, until: until)
+        let ftsQuery = try ftsQuery(query, mode: mode)
+        let orderBy = mode == .exact
+            ? "im.date DESC, im.message_id DESC"
+            : "search_score ASC, im.date DESC, im.message_id DESC"
         return try loadMessages(
             """
             SELECT im.message_id, im.guid, im.plain_text, im.text_source, im.is_from_me, im.service,
                    im.handle_id, im.handle, im.chat_id, im.chat_guid, im.display_name,
                    im.chat_identifier, im.date, im.indexed_at,
-                   (SELECT ci.display_name FROM contact_identity ci WHERE ci.identity_value = lower(im.handle) LIMIT 1)
-            FROM message_fts fts
-            JOIN indexed_message im ON im.message_id = fts.rowid
+                   (SELECT ci.display_name FROM contact_identity ci WHERE ci.identity_value = lower(im.handle) LIMIT 1),
+                   bm25(message_fts) AS search_score
+            FROM message_fts
+            JOIN indexed_message im ON im.message_id = message_fts.rowid
             WHERE message_fts MATCH ?
               AND (
                 ? = ''
@@ -350,19 +371,24 @@ final class IndexStore: @unchecked Sendable {
                 OR im.display_name LIKE ? ESCAPE '\\' COLLATE NOCASE
                 OR im.chat_identifier LIKE ? ESCAPE '\\' COLLATE NOCASE
               )
-            ORDER BY im.date DESC, im.message_id DESC
+              AND im.date >= ?
+              AND im.date <= ?
+            ORDER BY \(orderBy)
             LIMIT ? OFFSET ?
             """,
             [
-                .text(ftsPhrase(query)),
+                .text(ftsQuery),
                 .text(participantQuery),
                 .text(pattern),
                 .text(pattern),
                 .text(pattern),
                 .text(pattern),
+                .int64(bounds.since),
+                .int64(bounds.until),
                 .int(normalizeLimit(limit, defaultValue: 50)),
                 .int(max(0, offset))
-            ]
+            ],
+            searchScoreColumn: 15
         )
     }
 
@@ -548,6 +574,9 @@ final class IndexStore: @unchecked Sendable {
             CREATE INDEX IF NOT EXISTS contact_identity_display_name_idx
             ON contact_identity(display_name);
 
+            CREATE INDEX IF NOT EXISTS indexed_message_date_idx
+            ON indexed_message(date);
+
             CREATE VIRTUAL TABLE IF NOT EXISTS message_fts USING fts5(
                 plain_text,
                 content='indexed_message',
@@ -571,7 +600,7 @@ final class IndexStore: @unchecked Sendable {
         )
     }
 
-    private func loadMessages(_ sql: String, _ bindings: [SQLiteValue]) throws -> [IndexedMessage] {
+    private func loadMessages(_ sql: String, _ bindings: [SQLiteValue], searchScoreColumn: Int32? = nil) throws -> [IndexedMessage] {
         try db.query(sql, bindings) { statement in
             IndexedMessage(
                 id: statement.int64(0),
@@ -588,7 +617,8 @@ final class IndexStore: @unchecked Sendable {
                 displayName: statement.string(10),
                 chatIdentifier: statement.string(11),
                 sentAt: unixDate(statement.int64(12)),
-                indexedAt: unixDate(statement.int64(13)) ?? Date(timeIntervalSince1970: 0)
+                indexedAt: unixDate(statement.int64(13)) ?? Date(timeIntervalSince1970: 0),
+                searchScore: searchScoreColumn.flatMap { statement.isNull($0) ? nil : statement.double($0) }
             )
         }
     }
@@ -628,6 +658,13 @@ private func unixTimestamp(_ value: Date?) -> Int64 {
     value.map { Int64($0.timeIntervalSince1970) } ?? 0
 }
 
+private func dateBounds(since: Date?, until: Date?) -> (since: Int64, until: Int64) {
+    (
+        since: since.map { Int64($0.timeIntervalSince1970) } ?? 0,
+        until: until.map { Int64($0.timeIntervalSince1970) } ?? Int64.max
+    )
+}
+
 private func normalizeLimit(_ value: Int, defaultValue: Int) -> Int {
     if value <= 0 {
         return defaultValue
@@ -635,8 +672,55 @@ private func normalizeLimit(_ value: Int, defaultValue: Int) -> Int {
     return min(value, 500)
 }
 
+private func ftsQuery(_ value: String, mode: SearchMode) throws -> String {
+    switch mode {
+    case .exact:
+        return ftsPhrase(value)
+    case .all:
+        let terms = searchTerms(value)
+        guard !terms.isEmpty else {
+            throw AppError.badRequest("search query must include at least one word")
+        }
+        return terms.map(ftsPhrase).joined(separator: " AND ")
+    case .any, .ranked:
+        let terms = searchTerms(value)
+        guard !terms.isEmpty else {
+            throw AppError.badRequest("search query must include at least one word")
+        }
+        return terms.map(ftsPhrase).joined(separator: " OR ")
+    }
+}
+
 private func ftsPhrase(_ value: String) -> String {
     "\"\(value.replacingOccurrences(of: "\"", with: "\"\""))\""
+}
+
+private func searchTerms(_ value: String) -> [String] {
+    var terms: [String] = []
+    var current = ""
+
+    for scalar in value.unicodeScalars {
+        if CharacterSet.alphanumerics.contains(scalar) {
+            current.unicodeScalars.append(scalar)
+        } else if !current.isEmpty {
+            terms.append(current)
+            current = ""
+        }
+    }
+
+    if !current.isEmpty {
+        terms.append(current)
+    }
+
+    var seen = Set<String>()
+    return terms.filter { term in
+        let key = term.lowercased()
+        guard !seen.contains(key) else {
+            return false
+        }
+        seen.insert(key)
+        return true
+    }
 }
 
 private func likePattern(_ value: String) -> String {

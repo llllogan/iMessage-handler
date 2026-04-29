@@ -32,6 +32,7 @@ struct IndexedMessage: Codable {
     let chatIdentifier: String?
     let sentAt: Date?
     let indexedAt: Date
+    let searchScore: Double?
 }
 
 struct IndexStatus: Codable {

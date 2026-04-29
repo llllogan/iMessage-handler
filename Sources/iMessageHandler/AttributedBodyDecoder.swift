@@ -19,7 +19,8 @@ struct AttributedBodyDecoder {
 
     private func decodeAttributedArchive(_ data: Data) -> String? {
         for decode in [decodeSecureObject, decodeRootObject, decodeTypedStream] {
-            if let decoded = decode(data)?.trimmingCharacters(in: .whitespacesAndNewlines), !decoded.isEmpty {
+            if let decoded = decode(data),
+               !decoded.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 return decoded
             }
         }
@@ -153,7 +154,7 @@ struct AttributedBodyDecoder {
 
     private func isPlausibleTypedStreamText(_ value: String) -> Bool {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmed == value, !trimmed.isEmpty else {
+        guard !trimmed.isEmpty else {
             return false
         }
 

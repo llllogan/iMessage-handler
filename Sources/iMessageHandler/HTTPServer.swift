@@ -7,6 +7,7 @@ struct HTTPRequest {
     let method: String
     let path: String
     let query: [String: String]
+    let headers: [String: String]
 }
 
 struct HTTPResponse {
@@ -126,7 +127,20 @@ private func parseRequest(_ data: Data) throws -> HTTPRequest {
         query[item.name] = item.value ?? ""
     }
 
-    return HTTPRequest(method: method, path: components.path, query: query)
+    var headers: [String: String] = [:]
+    for line in raw.components(separatedBy: "\r\n").dropFirst() {
+        if line.isEmpty {
+            break
+        }
+        let fields = line.split(separator: ":", maxSplits: 1).map(String.init)
+        guard fields.count == 2 else {
+            continue
+        }
+        headers[fields[0].trimmingCharacters(in: .whitespacesAndNewlines).lowercased()] =
+            fields[1].trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    return HTTPRequest(method: method, path: components.path, query: query, headers: headers)
 }
 
 private func errorResponse(_ message: String, status: Int) -> HTTPResponse {
@@ -140,6 +154,7 @@ private func reasonPhrase(_ status: Int) -> String {
     case 200: "OK"
     case 202: "Accepted"
     case 400: "Bad Request"
+    case 401: "Unauthorized"
     case 404: "Not Found"
     case 405: "Method Not Allowed"
     default: "Internal Server Error"

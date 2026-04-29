@@ -116,7 +116,8 @@ final class Indexer: @unchecked Sendable {
             displayName: source.displayName,
             chatIdentifier: source.chatIdentifier,
             sentAt: appleDate(source.date),
-            indexedAt: Date()
+            indexedAt: Date(),
+            searchScore: nil
         )
     }
 }

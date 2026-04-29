@@ -156,6 +156,14 @@ final class SQLiteStatement {
         int(column) != 0
     }
 
+    func double(_ column: Int32) -> Double {
+        sqlite3_column_double(raw, column)
+    }
+
+    func isNull(_ column: Int32) -> Bool {
+        sqlite3_column_type(raw, column) == SQLITE_NULL
+    }
+
     func string(_ column: Int32) -> String? {
         guard let text = sqlite3_column_text(raw, column) else {
             return nil

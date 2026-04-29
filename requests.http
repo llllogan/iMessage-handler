@@ -1,7 +1,9 @@
 @host = http://127.0.0.1:8080
-@person = Tyler
+@person = Julian
 @messageID = 157312
-@phrase = birthday
+@phrase = n
+@since = 2026-04-01
+@until = 2026-04-28
 
 ### Health
 GET {{host}}/healthz
@@ -27,8 +29,23 @@ GET {{host}}/api/messages/search?person={{person}}&limit=50
 ### Search messages containing a word or phrase
 GET {{host}}/api/messages/search?phrase={{phrase}}&limit=50
 
+### Ranked weighted keyword search
+GET {{host}}/api/messages/search?phrase=school%20pickup%20time&mode=ranked&limit=50
+
+### Exact phrase search
+GET {{host}}/api/messages/search?phrase=school%20pickup%20time&mode=exact&limit=50
+
 ### Search messages with a person containing a word or phrase
 GET {{host}}/api/messages/search?person={{person}}&phrase={{phrase}}&limit=50
+
+### Search messages with a person during a relative timeframe
+GET {{host}}/api/messages/search?person={{person}}&timeframe=last_week&limit=50
+
+### Search messages containing a phrase between two dates
+GET {{host}}/api/messages/search?phrase={{phrase}}&since={{since}}&until={{until}}&limit=50
+
+### Browse all indexed messages between two dates
+GET {{host}}/api/messages/search?since={{since}}&until={{until}}&limit=50
 
 ### Fetch surrounding conversation context for one message
 GET {{host}}/api/messages/{{messageID}}/context?before=10&after=10

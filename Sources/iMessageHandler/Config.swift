@@ -6,6 +6,7 @@ struct Config {
     let messagesDBPath: String
     let indexDBPath: String
     let syncIntervalSeconds: TimeInterval
+    let apiToken: String?
 
     static func load() throws -> Config {
         let env = ProcessInfo.processInfo.environment
@@ -18,8 +19,14 @@ struct Config {
             port: UInt16(env["IMESSAGE_PORT"] ?? "8080") ?? 8080,
             messagesDBPath: messagesDBPath,
             indexDBPath: expandHome(env["IMESSAGE_INDEX_DB_PATH"] ?? defaultIndexPath, home: home),
-            syncIntervalSeconds: TimeInterval(env["IMESSAGE_SYNC_INTERVAL_SECONDS"] ?? "30") ?? 30
+            syncIntervalSeconds: TimeInterval(env["IMESSAGE_SYNC_INTERVAL_SECONDS"] ?? "30") ?? 30,
+            apiToken: nonEmpty(env["IMESSAGE_API_TOKEN"])
         )
+    }
+
+    private static func nonEmpty(_ value: String?) -> String? {
+        let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmed.isEmpty ? nil : trimmed
     }
 
     private static func expandHome(_ path: String, home: String) -> String {

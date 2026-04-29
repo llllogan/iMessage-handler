@@ -48,6 +48,15 @@ IMESSAGE_PORT=9090 swift run imessage-handler
 IMESSAGE_DB_PATH="$HOME/Library/Messages/chat.db" swift run imessage-handler
 IMESSAGE_INDEX_DB_PATH="$HOME/Library/Application Support/imessage-handler/index.sqlite" swift run imessage-handler
 IMESSAGE_SYNC_INTERVAL_SECONDS=15 swift run imessage-handler
+IMESSAGE_API_TOKEN="long-random-token" swift run imessage-handler
+```
+
+You can also copy `.env.example` to `.env` and run `swift run imessage-handler`. Values already exported in your shell take priority over `.env`.
+
+When `IMESSAGE_API_TOKEN` is set, every `/api/*` request must include:
+
+```http
+Authorization: Bearer long-random-token
 ```
 
 ## Sync Model
@@ -103,10 +112,18 @@ Query parameters:
 
 - `person`: contact name, phone number, email address, group chat name, or chat identifier
 - `phrase`: word or phrase to search in decoded message text
+- `since`: optional inclusive lower date bound, as `YYYY-MM-DD`, ISO-8601, or Unix timestamp
+- `until`: optional inclusive upper date bound, as `YYYY-MM-DD`, ISO-8601, or Unix timestamp
+- `timeframe`: optional relative range: `today`, `yesterday`, `this_week`, `last_week`, `this_month`, `last_month`, `last_7_days`, `last_14_days`, `last_30_days`, or `last_90_days`
+- `mode`: optional text search mode for `phrase`, default `ranked`
+  - `ranked`: weighted keyword search using SQLite FTS5 BM25 relevance
+  - `exact`: exact phrase search
+  - `all`: every search term must match
+  - `any`: at least one search term must match
 - `limit`: optional result limit, default `50`, max `500`
 - `offset`: optional pagination offset
 
-At least one of `person` or `phrase` is required.
+At least one of `person`, `phrase`, `since`, `until`, or `timeframe` is required.
 
 Examples:
 
@@ -114,6 +131,10 @@ Examples:
 GET http://127.0.0.1:8080/api/messages/search?person=Julian&limit=50
 GET http://127.0.0.1:8080/api/messages/search?phrase=Wordle&limit=50
 GET http://127.0.0.1:8080/api/messages/search?person=Julian&phrase=Wordle&limit=50
+GET http://127.0.0.1:8080/api/messages/search?person=Julian&timeframe=last_week&limit=50
+GET http://127.0.0.1:8080/api/messages/search?phrase=school%20pickup%20time&mode=ranked&limit=50
+GET http://127.0.0.1:8080/api/messages/search?phrase=school%20pickup%20time&mode=exact&limit=50
+GET http://127.0.0.1:8080/api/messages/search?phrase=flight&since=2026-04-01&until=2026-04-28
 ```
 
 ### `GET /api/messages/{messageID}/context`
