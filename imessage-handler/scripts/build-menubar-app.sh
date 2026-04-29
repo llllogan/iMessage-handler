@@ -17,6 +17,7 @@ swift build -c "$CONFIGURATION" --product "$PRODUCT_NAME"
 rm -rf "$APP_DIR"
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
 cp "$ROOT/.build/$CONFIGURATION/$PRODUCT_NAME" "$MACOS_DIR/$PRODUCT_NAME"
+chmod +x "$MACOS_DIR/$PRODUCT_NAME"
 if [[ -f "$ROOT/.env" ]]; then
   cp "$ROOT/.env" "$RESOURCES_DIR/.env"
 fi
@@ -51,6 +52,8 @@ cat > "$CONTENTS_DIR/Info.plist" <<PLIST
 </dict>
 </plist>
 PLIST
+
+codesign --force --deep --sign - "$APP_DIR"
 
 echo "Built $APP_DIR"
 echo "Grant Full Disk Access to this app in System Settings before expecting Messages database access."

@@ -2,7 +2,6 @@ import AppKit
 import Foundation
 import iMessageHandlerCore
 
-@main
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
@@ -17,8 +16,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func configureMenu() {
-        let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        statusItem.button?.title = "iMessage"
+        let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        if let button = statusItem.button {
+            button.image = NSImage(systemSymbolName: "message", accessibilityDescription: "iMessage Handler")
+            button.toolTip = "iMessage Handler"
+        }
 
         let menu = NSMenu()
         statusMenuItem.isEnabled = false
